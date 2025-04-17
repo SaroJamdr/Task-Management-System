@@ -9,18 +9,26 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, login
 from ..models import CustomUser
 from rest_framework.permissions import IsAuthenticated
-from ..serializers.user_serializer import RegisterSerializer, LoginSerializer, ProfileSerializer
+from ..serializers.user_serializer import RegisterSerializer, LoginSerializer, ProfileSerializer, UserSerializer
 
 class RegisterView(APIView):
+    queryset= CustomUser.objects.all()
     permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer
+
     def post(self, request, *args, **kwargs):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        if serializer.is_valid():
-            user= serializer.save()
-            refresh= RefreshToken.for_user(user)
-            return Response(user,{'token': refresh}, status=status.HTTP_201_CREATED)
+        
+        user = serializer.save()
+        refresh = RefreshToken.for_user(user)
+        user_data = RegisterSerializer(user).data
+        response_data = {
+        'user': user_data,
+        'token': str(refresh)
+    }
+        return Response(response_data, status=status.HTTP_201_CREATED)
     
 
 class UserProfileView(APIView):
@@ -35,9 +43,10 @@ class UserProfileView(APIView):
 
 # @method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
+    class_serializer= LoginSerializer
     permission_classes= [AllowAny]
     @csrf_exempt
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         username_or_email= request.data.get('email')
         password= request.data.get('password')
         user = authenticate(request, username=username_or_email, password=password)
