@@ -1,15 +1,15 @@
 from rest_framework import viewsets, permissions
-from accounts.models import CustomUser
 from rest_framework.decorators import action
 from ..models import Task
-from ..serializers.task_serializer import TaskListSerializer, TaskRetriveSerializer, TaskWriteSerializer
-from rest_framework.generics import CreateAPIView
-from rest_framework.filters import SearchFilter, OrderingFilter
+from ..serializers.task_serializer import TaskListSerializer, TaskRetriveSerializer, TaskWriteSerializer, TaskStatusUpdateSerializer
 from django_filters .rest_framework import DjangoFilterBackend
 from tasks.utilities.permissions import IsAssignedUserOrAdmin, IsAdmin
+from ..utilities.pagination import MyPageNumberPagination
 
 class TaskViewSet(viewsets.ModelViewSet):
+    permission_classes= [permissions.IsAuthenticated]
     queryset = Task.objects.all()
+    pagination_class= MyPageNumberPagination
     serializer_class = TaskListSerializer
     filter_backends = [DjangoFilterBackend]
 
@@ -22,7 +22,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.request.method in ['POST', 'DELETE', 'PUT']:
             return [IsAdmin()]
         if self.request.method == ['GET','PATCH']:
-            return [permissions.IsAuthenticated()]
+            return [IsAssignedUserOrAdmin()]
         return super().get_permissions()
     
     def get_queryset(self):
@@ -34,7 +34,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
-    @action(detail=True, methods=['patch'], permission_classes=[permissions.IsAuthenticated, IsAssignedUserOrAdmin])
+    @action(detail=True, methods=['PATCH'],  permission_classes=[permissions.IsAuthenticated, IsAssignedUserOrAdmin])
     def status(self, request, pk=None):
         task = self.get_object()
         new_status = request.data.get('status')
@@ -50,7 +50,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response({"message": "Status updated", "status": task.status})
     
     def get_serializer_class(self):
-        if self.action in ['create', 'update''partial_update']:
+        if self.action in ['create', 'update', 'partial_update']:
+            if self.request.user.role != 'admin' and self.request.method == 'PATCH':
+                return TaskStatusUpdateSerializer
             return TaskWriteSerializer
         elif self.action == 'retrive':
             return TaskRetriveSerializer

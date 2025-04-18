@@ -1,4 +1,3 @@
-from rest_framework.decorators import api_view
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,10 +5,11 @@ from rest_framework.permissions import AllowAny
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from ..models import CustomUser
 from rest_framework.permissions import IsAuthenticated
-from ..serializers.user_serializer import RegisterSerializer, LoginSerializer, ProfileSerializer, UserSerializer
+
+from ..serializers.user_serializer import RegisterSerializer, ProfileSerializer, LoginSerializer
 
 class RegisterView(APIView):
     queryset= CustomUser.objects.all()
@@ -34,16 +34,12 @@ class RegisterView(APIView):
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
-        serializer= ProfileSerializer(request.user)
-        if serializer.is_valid():
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-
+        serializer = ProfileSerializer(instance=request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # @method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
-    class_serializer= LoginSerializer
+    # class_serializer= UserSerializer
     permission_classes= [AllowAny]
     @csrf_exempt
     def post(self, request, *args, **kwargs):
@@ -75,3 +71,9 @@ class LoginView(APIView):
             else:
                 return Response({'error': 'Invalid username/email'}, status=status.HTTP_401_UNAUTHORIZED)
             
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        logout(request)
+        return Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
